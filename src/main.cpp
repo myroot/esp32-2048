@@ -60,6 +60,8 @@ uint16_t tileTextColor(int val) {
   return (val <= 4) ? rgb(119, 110, 101) : rgb(249, 246, 242);
 }
 
+#include <vector>
+
 // ─── Game State ───────────────────────────────────────────────
 int board[GRID_SIZE][GRID_SIZE];
 int score = 0, best = 0;
@@ -67,6 +69,32 @@ bool gameOver = false;
 bool won = false;
 
 int newTileR = -1, newTileC = -1; // Position of newly spawned tile
+
+// ─── History Stack for Infinite Undo ──────────────────────────
+struct BoardState {
+  int board[GRID_SIZE][GRID_SIZE];
+  int score;
+  bool won;
+};
+std::vector<BoardState> history;
+
+void undoMove();
+
+// Helper to determine if a touch coordinate hits NEW GAME or UNDO button
+// Handles both (ScreenX=ty, ScreenY=tx) and (ScreenX=tx, ScreenY=ty) seamlessly
+int getHeaderButton(int32_t t1, int32_t t2) {
+  // Check Mode 1: ScreenX = t2, ScreenY = t1
+  if (t1 >= 0 && t1 <= 95) {
+    if (t2 >= 10 && t2 < 125) return 1; // NEW GAME
+    if (t2 >= 125 && t2 < 245) return 2; // UNDO
+  }
+  // Check Mode 2: ScreenX = t1, ScreenY = t2
+  if (t2 >= 0 && t2 <= 95) {
+    if (t1 >= 10 && t1 < 125) return 1; // NEW GAME
+    if (t1 >= 125 && t1 < 245) return 2; // UNDO
+  }
+  return 0; // Not a header button
+}
 
 // ─── Touch Swipe Tracking ─────────────────────────────────────
 int32_t startX = 0, startY = 0;
@@ -115,6 +143,7 @@ void initGame() {
   won = false;
   newTileR = -1;
   newTileC = -1;
+  history.clear();
   addRandomTile();
   addRandomTile();
 }
@@ -155,16 +184,24 @@ void drawHeader() {
   lcd.setTextColor(rgb(119, 110, 101));
   lcd.setTextSize(4);
   lcd.setTextDatum(TL_DATUM);
-  lcd.drawString("2048", 15, 10);
+  lcd.drawString("2048", 15, 8);
 
-  // NEW GAME Button (Official #8f7a66)
-  lcd.fillRoundRect(15, 45, 115, 28, 6, rgb(143, 122, 102));
+  // NEW GAME Button (Official #8f7a66) [X: 15..120, Y: 44..72]
+  lcd.fillRoundRect(15, 44, 105, 28, 6, rgb(143, 122, 102));
   lcd.setTextSize(2);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextDatum(MC_DATUM);
-  lcd.drawString("NEW GAME", 72, 59);
+  lcd.drawString("NEW", 67, 58);
 
-  // SCORE Box (Official #bbada0)
+  // UNDO Button (Active: #8f7a66, Disabled: #d0c8be) [X: 130..225, Y: 44..72]
+  uint16_t undoBg = (!history.empty()) ? rgb(143, 122, 102) : rgb(205, 193, 180);
+  lcd.fillRoundRect(130, 44, 95, 28, 6, undoBg);
+  lcd.setTextSize(2);
+  lcd.setTextColor(TFT_WHITE);
+  lcd.setTextDatum(MC_DATUM);
+  lcd.drawString("UNDO", 177, 58);
+
+  // SCORE Box (Official #bbada0) [X: 240..345, Y: 8..68]
   lcd.fillRoundRect(240, 8, 105, 60, 8, rgb(187, 173, 160));
   lcd.setTextSize(1);
   lcd.setTextColor(rgb(238, 228, 218));
@@ -173,7 +210,7 @@ void drawHeader() {
   lcd.setTextColor(TFT_WHITE);
   lcd.drawString(String(score), 292, 44);
 
-  // BEST Box (Official #bbada0)
+  // BEST Box (Official #bbada0) [X: 360..465, Y: 8..68]
   lcd.fillRoundRect(360, 8, 105, 60, 8, rgb(187, 173, 160));
   lcd.setTextSize(1);
   lcd.setTextColor(rgb(238, 228, 218));
@@ -233,6 +270,27 @@ void redrawStatic() {
     drawOverlay("Game Over", "Tap NEW GAME to retry", rgb(255, 100, 100));
 }
 
+void undoMove() {
+  Serial.printf("[UNDO] Button triggered! History size: %u\n", (unsigned int)history.size());
+  if (history.empty()) {
+    Serial.println("[UNDO] History is empty, nothing to undo.");
+    return;
+  }
+  BoardState last = history.back();
+  history.pop_back();
+
+  memcpy(board, last.board, sizeof(board));
+  score = last.score;
+  won = last.won;
+  gameOver = false;
+  newTileR = -1;
+  newTileC = -1;
+
+  Serial.printf("[UNDO] Restored board! Remaining history: %u, Score: %d\n",
+                (unsigned int)history.size(), score);
+  redrawStatic();
+}
+
 // ─── Physical cell rotation helper ────────────────────────────
 void getPhysCell(int r, int c, int dir, int &pr, int &pc) {
   switch (dir) {
@@ -281,6 +339,12 @@ bool canMove() {
 void processMove(int dir) { // 0=Up, 1=Right, 2=Down, 3=Left
   if (gameOver)
     return;
+
+  // Snapshot current state BEFORE any rotation or score increment
+  int prevBoard[GRID_SIZE][GRID_SIZE];
+  memcpy(prevBoard, board, sizeof(board));
+  int prevScore = score;
+  bool prevWon = won;
 
   // 1. Rotate board to align target move direction with Left
   for (int i = 0; i < dir; i++)
@@ -341,6 +405,14 @@ void processMove(int dir) { // 0=Up, 1=Right, 2=Down, 3=Left
 
   if (!moved)
     return; // No move happened
+
+  // Save the PREVIOUS valid state to history stack
+  BoardState savedState;
+  memcpy(savedState.board, prevBoard, sizeof(prevBoard));
+  savedState.score = prevScore;
+  savedState.won = prevWon;
+  history.push_back(savedState);
+  Serial.printf("[MOVE] Move executed! History depth: %u\n", (unsigned int)history.size());
 
   // Update actual board matrix to target orientation
   for (int r = 0; r < GRID_SIZE; r++)
@@ -432,6 +504,19 @@ void loop() {
       lastX = tx;
       lastY = ty;
       swipeHandled = false;
+
+      // Immediate response on Touch Down if touching a header button
+      int btn = getHeaderButton(tx, ty);
+      if (btn == 1) {
+        Serial.printf("[TOUCH] NEW GAME button pressed (tx=%d, ty=%d)\n", (int)tx, (int)ty);
+        initGame();
+        redrawStatic();
+        swipeHandled = true;
+      } else if (btn == 2) {
+        Serial.printf("[TOUCH] UNDO button pressed (tx=%d, ty=%d)\n", (int)tx, (int)ty);
+        undoMove();
+        swipeHandled = true;
+      }
     } else {
       // Touch Drag / Move
       lastX = tx;
@@ -440,22 +525,11 @@ void loop() {
       int p_dx = lastY - startY;
       int p_dy = lastX - startX;
 
-      int p_startY = startX;
-      int p_startX = startY;
-
-      // Trigger swipe during drag if threshold reached (35px)
+      // Trigger swipe during drag if threshold reached (35px) and not already a button press
       if (!swipeHandled && (abs(p_dx) > 35 || abs(p_dy) > 35)) {
-        if (p_startY < HEADER_H + 10) {
-          // Tap / Swipe in Header area
-          if (p_startX < 140) {
-            initGame();
-            redrawStatic();
-          }
-          swipeHandled = true;
-        } else if (!gameOver) {
+        if (!gameOver) {
           if (abs(p_dx) > abs(p_dy)) {
-            processMove(p_dx > 0 ? 1
-                                 : 3); // Physical Right = 1, Physical Left = 3
+            processMove(p_dx > 0 ? 1 : 3); // Physical Right = 1, Physical Left = 3
           } else {
             processMove(p_dy > 0 ? 2 : 0); // Physical Down = 2, Physical Up = 0
           }
@@ -466,20 +540,26 @@ void loop() {
   } else if (wasTouching) {
     // Touch Release / Finger Up
     if (!swipeHandled) {
-      int p_dx = lastY - startY;
-      int p_dy = lastX - startX;
+      int btn = getHeaderButton(lastX, lastY);
+      if (btn == 0) btn = getHeaderButton(startX, startY);
 
-      int p_startY = startX;
-      int p_startX = startY;
-
-      if (p_startY < HEADER_H + 10 && p_startX < 140) {
+      if (btn == 1) {
+        Serial.println("[RELEASE] NEW GAME button tapped");
         initGame();
         redrawStatic();
-      } else if (!gameOver && (abs(p_dx) > 15 || abs(p_dy) > 15)) {
-        if (abs(p_dx) > abs(p_dy)) {
-          processMove(p_dx > 0 ? 1 : 3);
-        } else {
-          processMove(p_dy > 0 ? 2 : 0);
+      } else if (btn == 2) {
+        Serial.println("[RELEASE] UNDO button tapped");
+        undoMove();
+      } else if (!gameOver) {
+        // Quick flick swipe release
+        int p_dx = lastY - startY;
+        int p_dy = lastX - startX;
+        if (abs(p_dx) > 15 || abs(p_dy) > 15) {
+          if (abs(p_dx) > abs(p_dy)) {
+            processMove(p_dx > 0 ? 1 : 3);
+          } else {
+            processMove(p_dy > 0 ? 2 : 0);
+          }
         }
       }
     }
