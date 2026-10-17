@@ -1,5 +1,6 @@
 #include "LGFX_ESP32_4848S040.hpp"
 #include <Arduino.h>
+#include "splash_image.h"
 
 LGFX_ESP32_4848S040 lcd;
 LGFX_Sprite canvas(&lcd); // PSRAM Framebuffer for smooth rendering
@@ -79,19 +80,22 @@ struct BoardState {
 std::vector<BoardState> history;
 
 void undoMove();
+void showSplash();
 
-// Helper to determine if a touch coordinate hits NEW GAME or UNDO button
+// Helper to determine if a touch coordinate hits NEW GAME, UNDO, or PHOTO button
 // Handles both (ScreenX=ty, ScreenY=tx) and (ScreenX=tx, ScreenY=ty) seamlessly
 int getHeaderButton(int32_t t1, int32_t t2) {
   // Check Mode 1: ScreenX = t2, ScreenY = t1
   if (t1 >= 0 && t1 <= 95) {
-    if (t2 >= 10 && t2 < 125) return 1; // NEW GAME
-    if (t2 >= 125 && t2 < 245) return 2; // UNDO
+    if (t2 >= 10 && t2 < 96) return 1;  // NEW GAME
+    if (t2 >= 96 && t2 < 180) return 2; // UNDO
+    if (t2 >= 180 && t2 < 265) return 3;// PHOTO
   }
   // Check Mode 2: ScreenX = t1, ScreenY = t2
   if (t2 >= 0 && t2 <= 95) {
-    if (t1 >= 10 && t1 < 125) return 1; // NEW GAME
-    if (t1 >= 125 && t1 < 245) return 2; // UNDO
+    if (t1 >= 10 && t1 < 96) return 1;  // NEW GAME
+    if (t1 >= 96 && t1 < 180) return 2; // UNDO
+    if (t1 >= 180 && t1 < 265) return 3;// PHOTO
   }
   return 0; // Not a header button
 }
@@ -186,38 +190,45 @@ void drawHeader() {
   lcd.setTextDatum(TL_DATUM);
   lcd.drawString("2048", 15, 8);
 
-  // NEW GAME Button (Official #8f7a66) [X: 15..120, Y: 44..72]
-  lcd.fillRoundRect(15, 44, 105, 28, 6, rgb(143, 122, 102));
+  // NEW GAME Button (Official #8f7a66) [X: 15..93, Y: 44..72]
+  lcd.fillRoundRect(15, 44, 78, 28, 6, rgb(143, 122, 102));
   lcd.setTextSize(2);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextDatum(MC_DATUM);
-  lcd.drawString("NEW", 67, 58);
+  lcd.drawString("NEW", 54, 58);
 
-  // UNDO Button (Active: #8f7a66, Disabled: #d0c8be) [X: 130..225, Y: 44..72]
+  // UNDO Button (Active: #8f7a66, Disabled: #d0c8be) [X: 99..177, Y: 44..72]
   uint16_t undoBg = (!history.empty()) ? rgb(143, 122, 102) : rgb(205, 193, 180);
-  lcd.fillRoundRect(130, 44, 95, 28, 6, undoBg);
+  lcd.fillRoundRect(99, 44, 78, 28, 6, undoBg);
   lcd.setTextSize(2);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextDatum(MC_DATUM);
-  lcd.drawString("UNDO", 177, 58);
+  lcd.drawString("UNDO", 138, 58);
 
-  // SCORE Box (Official #bbada0) [X: 240..345, Y: 8..68]
-  lcd.fillRoundRect(240, 8, 105, 60, 8, rgb(187, 173, 160));
-  lcd.setTextSize(1);
-  lcd.setTextColor(rgb(238, 228, 218));
-  lcd.drawString("SCORE", 292, 20);
+  // PHOTO Button (Official #8f7a66) [X: 183..261, Y: 44..72]
+  lcd.fillRoundRect(183, 44, 78, 28, 6, rgb(143, 122, 102));
   lcd.setTextSize(2);
   lcd.setTextColor(TFT_WHITE);
-  lcd.drawString(String(score), 292, 44);
+  lcd.setTextDatum(MC_DATUM);
+  lcd.drawString("PHOTO", 222, 58);
 
-  // BEST Box (Official #bbada0) [X: 360..465, Y: 8..68]
-  lcd.fillRoundRect(360, 8, 105, 60, 8, rgb(187, 173, 160));
+  // SCORE Box (Official #bbada0) [X: 268..363, Y: 8..68]
+  lcd.fillRoundRect(268, 8, 95, 60, 8, rgb(187, 173, 160));
   lcd.setTextSize(1);
   lcd.setTextColor(rgb(238, 228, 218));
-  lcd.drawString("BEST", 412, 20);
+  lcd.drawString("SCORE", 315, 20);
   lcd.setTextSize(2);
   lcd.setTextColor(TFT_WHITE);
-  lcd.drawString(String(best), 412, 44);
+  lcd.drawString(String(score), 315, 44);
+
+  // BEST Box (Official #bbada0) [X: 371..466, Y: 8..68]
+  lcd.fillRoundRect(371, 8, 95, 60, 8, rgb(187, 173, 160));
+  lcd.setTextSize(1);
+  lcd.setTextColor(rgb(238, 228, 218));
+  lcd.drawString("BEST", 418, 20);
+  lcd.setTextSize(2);
+  lcd.setTextColor(TFT_WHITE);
+  lcd.drawString(String(best), 418, 44);
 }
 
 void renderBoardCanvas(float scaleNewTile = 1.0f) {
@@ -289,6 +300,17 @@ void undoMove() {
   Serial.printf("[UNDO] Restored board! Remaining history: %u, Score: %d\n",
                 (unsigned int)history.size(), score);
   redrawStatic();
+}
+
+void showSplash() {
+  Serial.println("[SPLASH] Showing splash image for 3 seconds...");
+  lcd.drawJpg(splash_img, splash_img_len, 0, 0);
+  delay(3000);
+  lcd.fillScreen(rgb(250, 248, 239));
+  redrawStatic();
+  wasTouching = false;
+  swipeHandled = true;
+  Serial.println("[SPLASH] Returned to game.");
 }
 
 // ─── Physical cell rotation helper ────────────────────────────
@@ -479,6 +501,11 @@ void setup() {
 
   lcd.init();
   lcd.setBrightness(200);
+
+  // Splash screen (DSC_1888 cropped & resized to 480x480) for 3 seconds
+  lcd.drawJpg(splash_img, splash_img_len, 0, 0);
+  delay(3000);
+
   lcd.fillScreen(rgb(250, 248, 239));
 
   // Create 380x380 double buffer canvas in 8MB PSRAM
@@ -515,6 +542,10 @@ void loop() {
       } else if (btn == 2) {
         Serial.printf("[TOUCH] UNDO button pressed (tx=%d, ty=%d)\n", (int)tx, (int)ty);
         undoMove();
+        swipeHandled = true;
+      } else if (btn == 3) {
+        Serial.printf("[TOUCH] PHOTO button pressed (tx=%d, ty=%d)\n", (int)tx, (int)ty);
+        showSplash();
         swipeHandled = true;
       }
     } else {

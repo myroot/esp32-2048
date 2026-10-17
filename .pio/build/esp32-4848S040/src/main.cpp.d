@@ -310,4 +310,5 @@
  /Users/sngnlee/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_lcd/include/esp_lcd_panel_vendor.h \
  /Users/sngnlee/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_lcd/include/esp_lcd_panel_ops.h \
  /Users/sngnlee/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_lcd/interface/esp_lcd_panel_interface.h \
- .pio/libdeps/esp32-4848S040/LovyanGFX/src/lgfx/v1/platforms/esp32s3/Panel_RGB.hpp
+ .pio/libdeps/esp32-4848S040/LovyanGFX/src/lgfx/v1/platforms/esp32s3/Panel_RGB.hpp \
+ src/splash_image.h
