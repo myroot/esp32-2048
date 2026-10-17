@@ -21,7 +21,7 @@ LGFX_Sprite canvas(&lcd); // PSRAM Framebuffer for smooth rendering
 
 // ─── Official Classic 2048 Color Palette (Gabriele Cirulli) ────
 static inline uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) {
-  return lcd.color565(b, g, r);
+  return lcd.color565(r, g, b);
 }
 
 // Official 2048 Tile Colors

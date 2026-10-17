@@ -41,33 +41,13 @@ public:
       // alignment: d0..d2  = G3..G5 (Signals 8..10) d3..d7  = R0..R4
       // (Signals 11..15) d8..d12 = B0..B4 (Signals 0..4) d13..d15= G0..G2
       // (Signals 5..7)
-      cfg.pin_d0 = 46; // G3 (Signal 8)
-      cfg.pin_d1 = 9;  // G4 (Signal 9)
-      cfg.pin_d2 = 10; // G5 (Signal 10)
 
-      cfg.pin_d3 = 11; // R0 (Signal 11)
-      cfg.pin_d4 = 12; // R1 (Signal 12)
-      cfg.pin_d5 = 13; // R2 (Signal 13)
-      cfg.pin_d6 = 14; // R3 (Signal 14)
-      cfg.pin_d7 = 0;  // R4 (Signal 15)
-
-      cfg.pin_d8 = 4;   // B0 (Signal 0)
-      cfg.pin_d9 = 5;   // B1 (Signal 1)
-      cfg.pin_d10 = 6;  // B2 (Signal 2)
-      cfg.pin_d11 = 7;  // B3 (Signal 3)
-      cfg.pin_d12 = 15; // B4 (Signal 4)
-
-      cfg.pin_d13 = 8;  // G0 (Signal 5)
-      cfg.pin_d14 = 20; // G1 (Signal 6)
-      cfg.pin_d15 = 3;  // G2 (Signal 7)
-
-      // fail
       // Red 0-4 (d0~d4)
-      cfg.pin_d0 = 11; // R0
-      cfg.pin_d1 = 12; // R1
-      cfg.pin_d2 = 13; // R2
-      cfg.pin_d3 = 14; // R3
-      cfg.pin_d4 = 0;  // R4
+      cfg.pin_d0 = 4;  // R0
+      cfg.pin_d1 = 5;  // R1
+      cfg.pin_d2 = 6;  // R2
+      cfg.pin_d3 = 7;  // R3
+      cfg.pin_d4 = 15; // R4
 
       // Green 0-5 (d5~d10)
       cfg.pin_d5 = 8;   // G0
@@ -78,11 +58,11 @@ public:
       cfg.pin_d10 = 10; // G5
 
       // Blue 0-4 (d11~d15) -> LovyanGFX Bus_RGB D11..D15 is Blue
-      cfg.pin_d11 = 4;  // B0
-      cfg.pin_d12 = 5;  // B1
-      cfg.pin_d13 = 6;  // B2
-      cfg.pin_d14 = 7;  // B3
-      cfg.pin_d15 = 15; // B4
+      cfg.pin_d11 = 11; // B0
+      cfg.pin_d12 = 12; // B1
+      cfg.pin_d13 = 13; // B2
+      cfg.pin_d14 = 14; // B3
+      cfg.pin_d15 = 0;  // B4
 
       // Horizontal timing
       cfg.freq_write = 16000000;
